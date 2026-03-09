@@ -16,11 +16,13 @@ class LogController {
 
   Future<void> addLog(String title, String desc, String category) async {
     final newLog = LogModel(
-      id: ObjectId(),
+      id: ObjectId().oid,
       title: title,
       description: desc,
       category: category,
       date: DateTime.now().toString(),
+      authorId: 'user_001', // dummy
+    teamId: 'team_alpha', 
     );
 
     try {
@@ -52,6 +54,8 @@ class LogController {
       description: newDesc,
       category: category,
       date: DateTime.now().toString(), // Update waktu saat diedit
+      authorId: oldLog.authorId, // Ambil dari catatan lama agar tidak hilang
+      teamId: oldLog.teamId,     // Ambil dari catatan lama agar tidak hilang
     );
 
     try {

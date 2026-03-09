@@ -454,7 +454,7 @@ class _LogViewState extends State<LogView> {
                       }
                       
                       return Dismissible(
-                        key: Key(log.id?.toHexString() ?? log.date),
+                        key: Key(log.id ?? log.date),
                         direction: DismissDirection.endToStart,
                         confirmDismiss: (direction) async {
                           return await showDialog(
