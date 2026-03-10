@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:lottie/lottie.dart';
 import 'log_controller.dart';
 import 'models/log_model.dart';
 import 'log_editor_page.dart';
 import '../auth/login_view.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 
 class LogView extends StatefulWidget {
   const LogView({super.key});
@@ -14,10 +15,14 @@ class LogView extends StatefulWidget {
   State<LogView> createState() => _LogViewState();
 }
 
-class _LogViewState extends State<LogView> {
+class _LogViewState extends State<LogView> with SingleTickerProviderStateMixin {
   late final LogController _controller;
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _filterScrollController = ScrollController();
+  
+  late AnimationController _glowController;
+  late Animation<double> _glowAnimation;
+
   bool _isLoading = true;
   bool _isOnline = true;
   String _selectedFilter = 'Semua';
@@ -30,6 +35,10 @@ class _LogViewState extends State<LogView> {
   void initState() {
     super.initState();
     _controller = LogController();
+    
+    _glowController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat(reverse: true);
+    _glowAnimation = Tween<double>(begin: 0.0, end: 15.0).animate(CurvedAnimation(parent: _glowController, curve: Curves.easeInOut));
+
     _checkInitialConnectivity();
 
     Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
@@ -54,6 +63,7 @@ class _LogViewState extends State<LogView> {
   void dispose() {
     _searchController.dispose();
     _filterScrollController.dispose();
+    _glowController.dispose();
     super.dispose();
   }
 
@@ -98,9 +108,9 @@ class _LogViewState extends State<LogView> {
         ),
         behavior: SnackBarBehavior.floating,
         backgroundColor: bgColor ?? Colors.deepPurple.shade900,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         margin: const EdgeInsets.all(16),
-        elevation: 6,
+        elevation: 10,
       ),
     );
   }
@@ -109,9 +119,9 @@ class _LogViewState extends State<LogView> {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.black87)),
-        content: Text(content, style: TextStyle(color: Colors.grey.shade700, height: 1.4)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.black87)),
+        content: Text(content, style: TextStyle(color: Colors.grey.shade700, height: 1.5)),
         actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
         actions: [
           TextButton(
@@ -121,8 +131,9 @@ class _LogViewState extends State<LogView> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 4,
+              shadowColor: Colors.redAccent.withOpacity(0.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () => Navigator.pop(context, true),
             child: Text(confirmText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -142,7 +153,7 @@ class _LogViewState extends State<LogView> {
         height: MediaQuery.of(context).size.height * 0.85,
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,8 +161,8 @@ class _LogViewState extends State<LogView> {
             Center(
               child: Container(
                 margin: const EdgeInsets.only(top: 12, bottom: 20),
-                width: 40,
-                height: 5,
+                width: 48,
+                height: 6,
                 decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
               ),
             ),
@@ -160,9 +171,13 @@ class _LogViewState extends State<LogView> {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: catColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                    child: Text(log.category.toUpperCase(), style: TextStyle(color: catColor, fontSize: 11, fontWeight: FontWeight.w900)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: catColor.withOpacity(0.15), 
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: catColor.withOpacity(0.3), width: 1),
+                    ),
+                    child: Text(log.category.toUpperCase(), style: TextStyle(color: catColor, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
                   ),
                   const Spacer(),
                   Container(
@@ -177,8 +192,8 @@ class _LogViewState extends State<LogView> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-              child: Text(log.title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.black87)),
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+              child: Text(log.title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.black87, height: 1.2)),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -195,8 +210,8 @@ class _LogViewState extends State<LogView> {
               ),
             ),
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Divider(height: 1, thickness: 1),
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Divider(height: 1, thickness: 1.5, color: Color(0xFFF0F0F0)),
             ),
             Expanded(
               child: SingleChildScrollView(
@@ -205,10 +220,11 @@ class _LogViewState extends State<LogView> {
                 child: MarkdownBody(
                   data: log.description,
                   styleSheet: MarkdownStyleSheet(
-                    p: TextStyle(fontSize: 15, color: Colors.grey.shade800, height: 1.6),
-                    h1: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
-                    h2: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+                    p: TextStyle(fontSize: 16, color: Colors.grey.shade800, height: 1.6),
+                    h1: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.black87),
+                    h2: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87),
                     listBullet: TextStyle(color: Colors.deepPurple.shade500),
+                    codeblockDecoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ),
@@ -231,11 +247,11 @@ class _LogViewState extends State<LogView> {
     switch (category) {
       case 'Pribadi': return const Color(0xFF00B4D8);
       case 'Pekerjaan': return const Color(0xFF4361EE);
-      case 'Urgent': return const Color(0xFFF72585);
-      case 'Lainnya': return const Color(0xFFF8961E);
-      case 'Mechanical': return const Color(0xFFE85D04);
-      case 'Electronic': return const Color(0xFF3F37C9);
-      case 'Software': return const Color(0xFF2DC653);
+      case 'Urgent': return const Color(0xFFFF006E);
+      case 'Lainnya': return const Color(0xFFFB5607);
+      case 'Mechanical': return const Color(0xFFFFBE0B);
+      case 'Electronic': return const Color(0xFF8338EC);
+      case 'Software': return const Color(0xFF38B000);
       default: return Colors.grey;
     }
   }
@@ -281,27 +297,28 @@ class _LogViewState extends State<LogView> {
       itemCount: 5,
       itemBuilder: (context, index) {
         return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(20),
+          margin: const EdgeInsets.only(bottom: 20),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.grey.shade100, width: 1.5),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: Colors.grey.shade50, width: 2),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15, offset: const Offset(0, 5))],
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(width: 60, height: 60, decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(16))),
-              const SizedBox(width: 16),
+              Container(width: 64, height: 64, decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(20))),
+              const SizedBox(width: 20),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(width: 160, height: 16, decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8))),
+                    Container(width: 180, height: 18, decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8))),
                     const SizedBox(height: 12),
-                    Container(width: double.infinity, height: 12, decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8))),
-                    const SizedBox(height: 16),
-                    Container(width: 90, height: 28, decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8))),
+                    Container(width: double.infinity, height: 14, decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8))),
+                    const SizedBox(height: 20),
+                    Container(width: 100, height: 30, decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(10))),
                   ],
                 ),
               ),
@@ -317,28 +334,34 @@ class _LogViewState extends State<LogView> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          TweenAnimationBuilder(
-            tween: Tween<double>(begin: 0.8, end: 1.0),
-            duration: const Duration(seconds: 1),
-            curve: Curves.elasticOut,
-            builder: (context, double val, child) {
-              return Transform.scale(
-                scale: val,
-                child: Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: Colors.deepPurple.shade50,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.note_add_rounded, size: 80, color: Colors.deepPurple.shade300),
-                ),
-              );
-            },
+          SizedBox(
+            height: 250,
+            child: Lottie.network(
+              'https://lottie.host/971b8ee6-0a25-419b-ab29-b6bb523c9657/wV5Rz36w72.json', 
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return TweenAnimationBuilder(
+                  tween: Tween<double>(begin: 0.8, end: 1.0),
+                  duration: const Duration(seconds: 1),
+                  curve: Curves.elasticOut,
+                  builder: (context, double val, child) {
+                    return Transform.scale(
+                      scale: val,
+                      child: Container(
+                        padding: const EdgeInsets.all(40),
+                        decoration: BoxDecoration(color: Colors.deepPurple.shade50, shape: BoxShape.circle),
+                        child: Icon(Icons.note_add_rounded, size: 80, color: Colors.deepPurple.shade300),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
-          const SizedBox(height: 32),
-          Text("Belum Ada Catatan", style: TextStyle(color: Colors.deepPurple.shade900, fontSize: 22, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 16),
+          Text("Belum Ada Catatan", style: TextStyle(color: Colors.deepPurple.shade900, fontSize: 24, fontWeight: FontWeight.w900)),
           const SizedBox(height: 12),
-          Text("Mulai tuangkan ide dan tugas Anda hari ini.\nKetuk tombol di bawah untuk memulai.", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade600, fontSize: 15, height: 1.5)),
+          Text("Mulai tuangkan ide dan tugas Anda hari ini.\nKetuk tombol cahaya di bawah untuk memulai.", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade600, fontSize: 15, height: 1.5, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -361,67 +384,71 @@ class _LogViewState extends State<LogView> {
         );
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 20),
+        margin: const EdgeInsets.only(bottom: 24),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: Colors.grey.shade100, width: 1.5),
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: Colors.white, width: 2),
           boxShadow: [
-            BoxShadow(color: catColor.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 8)),
+            BoxShadow(color: catColor.withOpacity(0.15), blurRadius: 25, spreadRadius: 2, offset: const Offset(0, 10)),
+            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
           ],
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(32),
+            splashColor: catColor.withOpacity(0.1),
+            highlightColor: catColor.withOpacity(0.05),
             onTap: () => _showLogDetail(log),
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(24),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [catColor.withOpacity(0.15), catColor.withOpacity(0.05)],
+                        colors: [catColor.withOpacity(0.2), catColor.withOpacity(0.05)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: catColor.withOpacity(0.2), width: 1.5),
                     ),
-                    child: Icon(_getCategoryIcon(log.category), color: catColor, size: 30),
+                    child: Icon(_getCategoryIcon(log.category), color: catColor, size: 32),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 20),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(log.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Colors.black87)),
+                        Text(log.title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 19, color: Colors.black87, letterSpacing: -0.5)),
                         const SizedBox(height: 8),
                         Text(log.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.grey.shade600, fontSize: 14, height: 1.5)),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Expanded(
                               child: Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
+                                spacing: 10,
+                                runSpacing: 10,
                                 crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(color: catColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(color: catColor.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
                                     child: Text(log.category.toUpperCase(), style: TextStyle(color: catColor, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
                                   ),
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(Icons.access_time_rounded, size: 14, color: Colors.grey.shade400),
-                                      const SizedBox(width: 4),
-                                      Text(_getTimeAgo(log.date), style: TextStyle(color: Colors.grey.shade500, fontSize: 11, fontWeight: FontWeight.w700)),
+                                      const SizedBox(width: 6),
+                                      Text(_getTimeAgo(log.date), style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.w700)),
                                     ],
                                   ),
                                 ],
@@ -437,12 +464,12 @@ class _LogViewState extends State<LogView> {
                                       Navigator.push(context, MaterialPageRoute(builder: (context) => LogEditorPage(log: log, controller: _controller)));
                                     },
                                     child: Container(
-                                      padding: const EdgeInsets.all(8),
+                                      padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(color: Colors.blue.shade50, shape: BoxShape.circle),
                                       child: Icon(Icons.edit_rounded, color: Colors.blue.shade600, size: 18),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 10),
                                   InkWell(
                                     onTap: () async {
                                       bool? confirm = await _showConfirmationDialog(
@@ -456,7 +483,7 @@ class _LogViewState extends State<LogView> {
                                       }
                                     }, 
                                     child: Container(
-                                      padding: const EdgeInsets.all(8),
+                                      padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(color: Colors.red.shade50, shape: BoxShape.circle),
                                       child: Icon(Icons.delete_rounded, color: Colors.red.shade600, size: 18),
                                     ),
@@ -465,14 +492,14 @@ class _LogViewState extends State<LogView> {
                               ),
                             ] else ...[
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(10)),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(Icons.lock_outline_rounded, color: Colors.grey.shade500, size: 14),
-                                    const SizedBox(width: 4),
-                                    Text("Terkunci", style: TextStyle(color: Colors.grey.shade600, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    const SizedBox(width: 6),
+                                    Text("Terkunci", style: TextStyle(color: Colors.grey.shade600, fontSize: 11, fontWeight: FontWeight.bold)),
                                   ],
                                 ),
                               ),
@@ -494,25 +521,25 @@ class _LogViewState extends State<LogView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FE),
+      backgroundColor: const Color(0xFFF4F6FB),
       body: Stack(
         children: [
           Container(
-            height: 280,
+            height: 300,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF311B92), Color(0xFF512DA8)],
+                colors: [Color(0xFF311B92), Color(0xFF512DA8), Color(0xFF673AB7)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.only(bottomLeft: Radius.circular(50), bottomRight: Radius.circular(50)),
+              borderRadius: BorderRadius.only(bottomLeft: Radius.circular(60), bottomRight: Radius.circular(60)),
             ),
           ),
           SafeArea(
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -520,11 +547,15 @@ class _LogViewState extends State<LogView> {
                         child: Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)]),
-                              child: const CircleAvatar(backgroundColor: Colors.white, radius: 22, child: Icon(Icons.face_retouching_natural, color: Color(0xFF512DA8), size: 28)),
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                color: Colors.white, 
+                                shape: BoxShape.circle, 
+                                boxShadow: [BoxShadow(color: Colors.deepPurple.shade900.withOpacity(0.5), blurRadius: 15, spreadRadius: 2)]
+                              ),
+                              child: const CircleAvatar(backgroundColor: Colors.white, radius: 24, child: Icon(Icons.face_retouching_natural, color: Color(0xFF512DA8), size: 32)),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 16),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -532,45 +563,51 @@ class _LogViewState extends State<LogView> {
                                   Text(
                                     LogController.currentRole == 'Ketua' ? "Ketua Tim" : "Anggota Tim",
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                                   ),
-                                  Text("${_getGreeting()}, punya rencana apa?", overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.deepPurple.shade100, fontSize: 12, fontWeight: FontWeight.w500)),
+                                  Text("${_getGreeting()}, punya rencana apa?", overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.deepPurple.shade100, fontSize: 13, fontWeight: FontWeight.w500)),
                                 ],
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 12),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             decoration: BoxDecoration(
-                              color: _isOnline ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
+                              color: _isOnline ? Colors.greenAccent.withOpacity(0.2) : Colors.orangeAccent.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: _isOnline ? Colors.greenAccent.withOpacity(0.5) : Colors.orangeAccent.withOpacity(0.5), width: 1),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Container(
-                                  width: 6, height: 6,
-                                  decoration: BoxDecoration(shape: BoxShape.circle, color: _isOnline ? Colors.greenAccent : Colors.orangeAccent),
+                                AnimatedContainer(
+                                  duration: const Duration(seconds: 1),
+                                  width: 8, height: 8,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle, 
+                                    color: _isOnline ? Colors.greenAccent : Colors.orangeAccent,
+                                    boxShadow: [BoxShadow(color: _isOnline ? Colors.greenAccent : Colors.orangeAccent, blurRadius: 6, spreadRadius: 1)],
+                                  ),
                                 ),
-                                const SizedBox(width: 4),
-                                Text(_isOnline ? "Online" : "Offline", style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                const SizedBox(width: 6),
+                                Text(_isOnline ? "Online" : "Offline", style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
                               ],
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 12),
                           IconButton(
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             icon: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
-                              child: const Icon(Icons.logout_rounded, color: Colors.white, size: 18),
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(14)),
+                              child: const Icon(Icons.logout_rounded, color: Colors.white, size: 20),
                             ),
                             onPressed: () async {
                               bool? confirm = await _showConfirmationDialog("Logout", "Yakin ingin keluar dari sesi aplikasi?", "Keluar");
@@ -587,25 +624,26 @@ class _LogViewState extends State<LogView> {
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 10))],
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [BoxShadow(color: Colors.deepPurple.shade900.withOpacity(0.15), blurRadius: 25, offset: const Offset(0, 10))],
                     ),
                     child: TextField(
                       controller: _searchController,
                       onChanged: (value) => setState(() {}),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                       decoration: InputDecoration(
                         hintText: "Cari judul, deskripsi, atau kategori...",
-                        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-                        prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF512DA8)),
+                        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14, fontWeight: FontWeight.normal),
+                        prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF512DA8), size: 26),
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 18),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 20),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 SizedBox(
-                  height: 50,
+                  height: 45,
                   child: ListView.builder(
                     controller: _filterScrollController,
                     scrollDirection: Axis.horizontal,
@@ -615,34 +653,40 @@ class _LogViewState extends State<LogView> {
                       final option = _filterOptions[index];
                       final isSelected = _selectedFilter == option;
                       return Padding(
-                        padding: const EdgeInsets.only(right: 10, top: 4, bottom: 4),
-                        child: ChoiceChip(
-                          label: Text(option, style: TextStyle(color: isSelected ? Colors.white : Colors.grey.shade700, fontWeight: FontWeight.bold, fontSize: 13)),
-                          selected: isSelected,
-                          onSelected: (selected) {
-                            if (selected) {
-                              setState(() => _selectedFilter = option);
-                              double screenWidth = MediaQuery.of(context).size.width;
-                              double targetOffset = (index * 90.0) - (screenWidth / 2) + 45.0;
-                              targetOffset = targetOffset.clamp(0.0, _filterScrollController.position.maxScrollExtent);
-                              _filterScrollController.animateTo(
-                                targetOffset,
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                              );
-                            }
-                          },
-                          backgroundColor: Colors.white,
-                          selectedColor: const Color(0xFF512DA8),
-                          checkmarkColor: Colors.white,
-                          side: BorderSide(color: isSelected ? Colors.transparent : Colors.grey.shade300, width: 1),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        padding: const EdgeInsets.only(right: 12),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          child: ChoiceChip(
+                            label: Text(option, style: TextStyle(color: isSelected ? Colors.white : Colors.grey.shade700, fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.5)),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              if (selected) {
+                                setState(() => _selectedFilter = option);
+                                double screenWidth = MediaQuery.of(context).size.width;
+                                double targetOffset = (index * 100.0) - (screenWidth / 2) + 50.0;
+                                targetOffset = targetOffset.clamp(0.0, _filterScrollController.position.maxScrollExtent);
+                                _filterScrollController.animateTo(
+                                  targetOffset,
+                                  duration: const Duration(milliseconds: 400),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              }
+                            },
+                            backgroundColor: Colors.white,
+                            selectedColor: const Color(0xFF512DA8),
+                            checkmarkColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            side: BorderSide(color: isSelected ? Colors.transparent : Colors.grey.shade300, width: 1.5),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            elevation: isSelected ? 4 : 0,
+                            shadowColor: const Color(0xFF512DA8).withOpacity(0.4),
+                          ),
                         ),
                       );
                     },
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 16),
                 Expanded(
                   child: _isLoading
                       ? _buildSkeletonLoading()
@@ -694,11 +738,11 @@ class _LogViewState extends State<LogView> {
                                         return await _showConfirmationDialog("Hapus Catatan", "Tindakan ini tidak bisa dibatalkan.", "Hapus");
                                       },
                                       background: Container(
-                                        margin: const EdgeInsets.only(bottom: 20),
-                                        padding: const EdgeInsets.symmetric(horizontal: 28),
+                                        margin: const EdgeInsets.only(bottom: 24),
+                                        padding: const EdgeInsets.symmetric(horizontal: 32),
                                         alignment: Alignment.centerRight,
-                                        decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(28)),
-                                        child: const Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 36),
+                                        decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(32)),
+                                        child: const Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 40),
                                       ),
                                       onDismissed: (direction) {
                                         _controller.removeLog(log);
@@ -719,15 +763,34 @@ class _LogViewState extends State<LogView> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF512DA8),
-        elevation: 8,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        onPressed: () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => LogEditorPage(controller: _controller)));
+      
+      // --- ANIMASI GLOW PADA TOMBOL FLOATING ACTION BUTTON ---
+      floatingActionButton: AnimatedBuilder(
+        animation: _glowAnimation,
+        builder: (context, child) {
+          return Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF512DA8).withOpacity(0.6),
+                  blurRadius: _glowAnimation.value + 10,
+                  spreadRadius: (_glowAnimation.value / 4),
+                ),
+              ],
+            ),
+            child: FloatingActionButton.extended(
+              backgroundColor: const Color(0xFF512DA8),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => LogEditorPage(controller: _controller)));
+              },
+              icon: const Icon(Icons.edit_document, color: Colors.white),
+              label: const Text("Catatan Baru", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.5)),
+            ),
+          );
         },
-        icon: const Icon(Icons.edit_document, color: Colors.white),
-        label: const Text("Catatan Baru", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
       ),
     );
   }
