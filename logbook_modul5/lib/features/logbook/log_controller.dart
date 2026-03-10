@@ -5,20 +5,25 @@ import 'models/log_model.dart';
 import '../../services/mongo_service.dart';
 
 class LogController {
+  // --- PENYIMPANAN USER AKTIF ---
+  static String currentUser = 'user_001'; // Default: Admin
+  static String currentRole = 'Ketua';
+  // ------------------------------
+
   final ValueNotifier<List<LogModel>> logsNotifier = ValueNotifier<List<LogModel>>([]);
   final _myBox = Hive.box<LogModel>('offline_logs');
 
   List<LogModel> get logs => logsNotifier.value;
 
   Future<void> loadLogs() async {
-    logsNotifier.value = _myBox.values.toList();
+    logsNotifier.value = List.from(_myBox.values);
     try {
       final cloudData = await MongoService().getLogs();
       await _myBox.clear();
       for (var log in cloudData) {
         await _myBox.put(log.id, log);
       }
-      logsNotifier.value = cloudData;
+      logsNotifier.value = List.from(cloudData);
     } catch (e) {
     }
   }
@@ -46,14 +51,15 @@ class LogController {
       description: desc,
       category: category,
       date: DateTime.now().toIso8601String(),
-      authorId: 'user_001',
+      authorId: currentUser, // <-- Menyimpan berdasarkan user yang sedang aktif
       teamId: 'team_alpha',
       isPublic: isPublic,
     );
     await _myBox.put(newLog.id, newLog);
-    await loadLogs();
+    logsNotifier.value = List.from(_myBox.values);
     try {
       await MongoService().insertLog(newLog);
+      await loadLogs();
     } catch (e) {
     }
   }
@@ -70,18 +76,20 @@ class LogController {
       isPublic: isPublic,
     );
     await _myBox.put(oldLog.id, updatedLog);
-    await loadLogs();
+    logsNotifier.value = List.from(_myBox.values);
     try {
       await MongoService().updateLog(updatedLog);
+      await loadLogs();
     } catch (e) {
     }
   }
 
   Future<void> removeLog(LogModel log) async {
     await _myBox.delete(log.id);
-    await loadLogs();
+    logsNotifier.value = List.from(_myBox.values);
     try {
       await MongoService().deleteLog(log.id!);
+      await loadLogs();
     } catch (e) {
     }
   }

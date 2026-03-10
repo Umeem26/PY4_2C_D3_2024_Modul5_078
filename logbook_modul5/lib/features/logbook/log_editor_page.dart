@@ -20,8 +20,12 @@ class LogEditorPage extends StatefulWidget {
 class _LogEditorPageState extends State<LogEditorPage> {
   late TextEditingController _titleController;
   late TextEditingController _descController;
-  String _selectedCategory = 'Pribadi';
-  final List<String> _categories = ['Pribadi', 'Pekerjaan', 'Urgent', 'Lainnya'];
+  
+  final List<String> _categories = [
+    'Pribadi', 'Pekerjaan', 'Urgent', 'Lainnya', 
+    'Mechanical', 'Electronic', 'Software'
+  ];
+  late String _selectedCategory;
   bool _isPublic = false;
 
   @override
@@ -29,19 +33,41 @@ class _LogEditorPageState extends State<LogEditorPage> {
     super.initState();
     _titleController = TextEditingController(text: widget.log?.title ?? '');
     _descController = TextEditingController(text: widget.log?.description ?? '');
-    _selectedCategory = widget.log?.category ?? 'Pribadi';
     _isPublic = widget.log?.isPublic ?? false;
+
+    String existingCategory = widget.log?.category ?? 'Pribadi';
+    if (!_categories.contains(existingCategory)) {
+      existingCategory = 'Pribadi';
+    }
+    _selectedCategory = existingCategory;
 
     _descController.addListener(() {
       setState(() {});
     });
   }
 
+  void _showCustomToast(String message, IconData icon, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: color,
+        margin: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
+        elevation: 6,
+      ),
+    );
+  }
+
   void _save() {
     if (_titleController.text.isEmpty || _descController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Judul dan deskripsi tidak boleh kosong", style: TextStyle(fontWeight: FontWeight.bold))),
-      );
+      _showCustomToast("Judul dan deskripsi tidak boleh kosong!", Icons.warning_amber_rounded, Colors.orange.shade700);
       return;
     }
 
@@ -52,6 +78,7 @@ class _LogEditorPageState extends State<LogEditorPage> {
         _selectedCategory,
         _isPublic,
       );
+      _showCustomToast("Catatan baru berhasil diamankan.", Icons.check_circle_outline, Colors.teal);
     } else {
       widget.controller.updateLog(
         widget.log!,
@@ -60,6 +87,7 @@ class _LogEditorPageState extends State<LogEditorPage> {
         _selectedCategory,
         _isPublic,
       );
+      _showCustomToast("Perubahan catatan berhasil disimpan.", Icons.update, Colors.blueAccent);
     }
     Navigator.pop(context);
   }

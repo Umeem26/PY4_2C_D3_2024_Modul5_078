@@ -52,7 +52,7 @@ class _LoginViewState extends State<LoginView> {
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => LogView(username: username),
+            pageBuilder: (context, animation, secondaryAnimation) => LogView(),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
             },
