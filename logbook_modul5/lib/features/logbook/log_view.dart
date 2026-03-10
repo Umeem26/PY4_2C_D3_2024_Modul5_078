@@ -8,7 +8,8 @@ import '../auth/login_view.dart';
 import '../../services/mongo_service.dart';
 import '../../helpers/log_helper.dart';
 import '../../services/access_control_service.dart';
-import 'log_editor_page.dart'; // Import halaman editor baru
+import 'log_editor_page.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class LogView extends StatefulWidget {
   final String username;
@@ -28,7 +29,16 @@ class _LogViewState extends State<LogView> {
   void initState() {
     super.initState();
     _controller = LogController();
-    Future.microtask(() => _controller.loadLogs());
+    Future.microtask(() => _initDatabase());
+    Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
+      // Cek apakah perangkat mendapatkan kembali koneksi internet (WiFi atau Seluler)
+      if (results.contains(ConnectivityResult.wifi) || results.contains(ConnectivityResult.mobile)) {
+        _controller.syncPendingData().then((_) {
+          // Menampilkan notifikasi kecil bahwa sinkronisasi sukses
+          _showCustomToast("Internet terhubung. Sinkronisasi latar belakang selesai!");
+        });
+      }
+    });
   }
 
   Future<void> _initDatabase() async {

@@ -14,8 +14,52 @@ class LogController {
   List<LogModel> get logs => logsNotifier.value;
 
   Future<void> loadLogs() async {
-    // Ambil data dari Hive secara instan tanpa loading lama
+    // 1. Tampilkan data dari Hive secara instan (Offline-First)
     logsNotifier.value = _myBox.values.toList();
+
+    // 2. Coba sinkronisasi latar belakang dari Cloud
+    try {
+      // Ambil data terbaru dari MongoDB (Global Truth)
+      final cloudData = await MongoService().getLogs();
+
+      // Bersihkan Hive lokal dan timpa dengan data valid dari Cloud
+      await _myBox.clear();
+
+      // Simpan kembali ke Hive agar cache terbarui
+      for (var log in cloudData) {
+        await _myBox.put(log.id, log);
+      }
+
+      // Perbarui UI
+      logsNotifier.value = cloudData;
+
+    } catch (e) {
+      // Jika internet mati, biarkan pengguna memakai data Hive tanpa memblokir layar
+    }
+  }
+
+  Future<void> syncPendingData() async {
+    final offlineData = _myBox.values.toList();
+    if (offlineData.isEmpty) return; // Jika kosong, tidak perlu sync
+
+    bool hasNewDataSynced = false;
+
+    // Coba kirim semua data yang ada di Hive ke Cloud
+    for (var log in offlineData) {
+      try {
+        // Jika data sudah ada di Cloud, MongoDB otomatis akan menolak (Duplicate Key Error).
+        // Jika data baru (dibuat saat offline), maka akan berhasil masuk.
+        await MongoService().insertLog(log);
+        hasNewDataSynced = true;
+      } catch (e) {
+        // Abaikan error (artinya data tersebut memang sudah tersinkron sebelumnya)
+      }
+    }
+
+    // Jika ada data baru yang berhasil naik ke awan, tarik ulang data ter-update
+    if (hasNewDataSynced) {
+      await loadLogs();
+    }
   }
 
   Future<void> addLog(String title, String desc, String category) async {
