@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'dart:math' as math;
 import 'package:intl/intl.dart';
 import 'log_controller.dart';
+import 'log_editor_page.dart';
 import 'models/log_model.dart';
 import '../auth/login_view.dart';
 import '../../services/mongo_service.dart';
