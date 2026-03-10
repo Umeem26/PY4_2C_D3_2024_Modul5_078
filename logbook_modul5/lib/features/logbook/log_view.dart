@@ -7,6 +7,8 @@ import 'models/log_model.dart';
 import '../auth/login_view.dart';
 import '../../services/mongo_service.dart';
 import '../../helpers/log_helper.dart';
+import '../../services/access_control_service.dart';
+import 'log_editor_page.dart'; // Import halaman editor baru
 
 class LogView extends StatefulWidget {
   final String username;
@@ -18,13 +20,9 @@ class LogView extends StatefulWidget {
 
 class _LogViewState extends State<LogView> {
   late final LogController _controller;
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _contentController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
   
   bool _isLoading = true;
-  final List<String> _categories = ['Pribadi', 'Pekerjaan', 'Urgent', 'Lainnya'];
-  String _selectedCategory = 'Pribadi';
 
   @override
   void initState() {
@@ -42,10 +40,9 @@ class _LogViewState extends State<LogView> {
         const Duration(seconds: 15),
         onTimeout: () => throw Exception("Koneksi Cloud Timeout."),
       );
-      await _controller.loadFromDisk();
+      await _controller.loadLogs();
     } catch (e) {
       if (mounted) {
-        // SOLUSI: Pesan error diperhalus
         _showCustomToast("Gagal terhubung ke Cloud. Periksa koneksi internet Anda.", isError: true);
       }
     } finally {
@@ -200,112 +197,14 @@ class _LogViewState extends State<LogView> {
     );
   }
 
-  void _showLogForm({LogModel? log}) {
-    bool isEdit = log != null;
-    _titleController.text = isEdit ? log.title : '';
-    _contentController.text = isEdit ? log.description : '';
-    _selectedCategory = isEdit ? log.category : 'Pribadi';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withOpacity(0.3),
-      builder: (context) => BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-        child: StatefulBuilder(
-          builder: (context, setStateSheet) {
-            return Container(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, top: 24, left: 24, right: 24),
-              decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32))),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(child: Container(width: 60, height: 6, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)))),
-                    const SizedBox(height: 28),
-                    Text(isEdit ? "Perbarui Catatan" : "Catatan Baru", style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.deepPurple.shade900)),
-                    const SizedBox(height: 24),
-                    TextField(controller: _titleController, decoration: InputDecoration(labelText: "Judul Catatan", prefixIcon: Icon(Icons.title_rounded, color: Colors.deepPurple.shade300), filled: true, fillColor: Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none))),
-                    const SizedBox(height: 16),
-                    TextField(controller: _contentController, maxLines: 4, decoration: InputDecoration(labelText: "Tuliskan deskripsi lengkap di sini...", alignLabelWithHint: true, filled: true, fillColor: Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none))),
-                    const SizedBox(height: 24),
-                    const Text("Kategori", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: _categories.map((cat) {
-                        bool isSelected = _selectedCategory == cat;
-                        Color catColor = _getCategoryColor(cat);
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.easeOutCubic,
-                          decoration: BoxDecoration(
-                            color: isSelected ? catColor : Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: isSelected ? catColor : Colors.grey.shade300, width: 1.5),
-                            boxShadow: isSelected ? [BoxShadow(color: catColor.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))] : [],
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(20),
-                              onTap: () => setStateSheet(() => _selectedCategory = cat),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(_getCategoryIcon(cat), size: 18, color: isSelected ? Colors.white : Colors.grey.shade600),
-                                    const SizedBox(width: 8),
-                                    Text(cat, style: TextStyle(fontWeight: FontWeight.bold, color: isSelected ? Colors.white : Colors.grey.shade600)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 32),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepPurple.shade700,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          elevation: 8,
-                          shadowColor: Colors.deepPurple.shade200,
-                        ),
-                        onPressed: () {
-                          if (_titleController.text.isEmpty || _contentController.text.isEmpty) {
-                            _showCustomToast("Judul dan Deskripsi tidak boleh kosong!", isError: true);
-                            return;
-                          }
-                          if (isEdit) {
-                            _controller.updateLog(log, _titleController.text, _contentController.text, _selectedCategory);
-                            _showCustomToast("Catatan berhasil diperbarui!");
-                          } else {
-                            _controller.addLog(_titleController.text, _contentController.text, _selectedCategory);
-                            _showCustomToast("Catatan baru berhasil disimpan!");
-                          }
-                          _titleController.clear();
-                          _contentController.clear();
-                          Navigator.pop(context);
-                        },
-                        child: Text(isEdit ? "Simpan Perubahan" : "Simpan Catatan", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                  ],
-                ),
-              ),
-            );
-          }
+  // --- FUNGSI NAVIGASI KE HALAMAN EDITOR BARU ---
+  void _goToEditor({LogModel? log}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LogEditorPage(
+          log: log,
+          controller: _controller,
         ),
       ),
     );
@@ -377,9 +276,8 @@ class _LogViewState extends State<LogView> {
                   return RefreshIndicator(
                     onRefresh: () async { 
                       try { 
-                        await _controller.loadFromDisk(); 
+                        await _controller.loadLogs(); 
                       } catch (e) { 
-                        // SOLUSI: Pesan error diperhalus
                         _showCustomToast("Koneksi terputus. Gagal menyegarkan data.", isError: true); 
                       } 
                     },
@@ -432,9 +330,8 @@ class _LogViewState extends State<LogView> {
                   color: Colors.deepPurple,
                   onRefresh: () async { 
                     try { 
-                      await _controller.loadFromDisk(); 
+                      await _controller.loadLogs(); 
                     } catch (e) { 
-                      // SOLUSI: Pesan error diperhalus
                       _showCustomToast("Koneksi terputus. Gagal menyegarkan data.", isError: true); 
                     } 
                   },
@@ -445,17 +342,23 @@ class _LogViewState extends State<LogView> {
                     itemBuilder: (context, index) {
                       final log = displayLogs[index];
                       Color categoryColor = _getCategoryColor(log.category);
+
+                      // --- GATEKEEPER ROLE CHECK ---
+                      final bool isOwner = log.authorId == 'user_001'; 
+                      final String currentRole = 'Anggota';
                       
                       String formattedDate = log.date;
                       try {
                         DateTime parsedDate = DateTime.parse(log.date);
                         formattedDate = DateFormat('dd MMM yyyy • HH:mm').format(parsedDate);
-                      } catch (e) {
-                      }
+                      } catch (e) {}
                       
                       return Dismissible(
                         key: Key(log.id ?? log.date),
-                        direction: DismissDirection.endToStart,
+                        // CEK IZIN HAPUS UNTUK DISMISSIBLE
+                        direction: AccessControlService.canPerform(currentRole, AccessControlService.actionDelete, isOwner: isOwner) 
+                                   ? DismissDirection.endToStart 
+                                   : DismissDirection.none,
                         confirmDismiss: (direction) async {
                           return await showDialog(
                             context: context,
@@ -488,7 +391,14 @@ class _LogViewState extends State<LogView> {
                             color: Colors.transparent,
                             child: InkWell(
                               borderRadius: BorderRadius.circular(24),
-                              onTap: () => _showLogForm(log: log),
+                              onTap: () {
+                                // CEK IZIN EDIT SEBELUM MEMBUKA HALAMAN EDITOR
+                                if (AccessControlService.canPerform(currentRole, AccessControlService.actionUpdate, isOwner: isOwner)) {
+                                  _goToEditor(log: log);
+                                } else {
+                                  _showCustomToast("Akses Ditolak: Anda tidak memiliki izin mengedit catatan ini.", isError: true);
+                                }
+                              },
                               splashColor: categoryColor.withOpacity(0.1),
                               highlightColor: categoryColor.withOpacity(0.05),
                               child: Padding(
@@ -519,7 +429,26 @@ class _LogViewState extends State<LogView> {
                                                 ),
                                               ),
                                               const SizedBox(width: 8),
-                                              Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400, size: 20),
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  // CEK IZIN TOMBOL EDIT
+                                                  if (AccessControlService.canPerform(currentRole, AccessControlService.actionUpdate, isOwner: isOwner))
+                                                    IconButton(
+                                                      icon: const Icon(Icons.edit_rounded, color: Colors.blue),
+                                                      onPressed: () => _goToEditor(log: log),
+                                                    ),
+                                                  // CEK IZIN TOMBOL HAPUS
+                                                  if (AccessControlService.canPerform(currentRole, AccessControlService.actionDelete, isOwner: isOwner))
+                                                    IconButton(
+                                                      icon: const Icon(Icons.delete_rounded, color: Colors.red),
+                                                      onPressed: () {
+                                                        _controller.removeLog(log);
+                                                        _showCustomToast("Catatan dihapus", isError: true);
+                                                      },
+                                                    ),
+                                                ],
+                                              ),
                                             ],
                                           ),
                                         ],
@@ -543,7 +472,7 @@ class _LogViewState extends State<LogView> {
       floatingActionButton: Container(
         decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.deepPurple.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 10))]),
         child: FloatingActionButton(
-          onPressed: () => _showLogForm(),
+          onPressed: () => _goToEditor(), // LANGSUNG KE EDITOR PAGE
           backgroundColor: Colors.deepPurple.shade600,
           splashColor: Colors.white.withOpacity(0.3),
           elevation: 0,
