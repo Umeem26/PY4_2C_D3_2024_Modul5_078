@@ -30,7 +30,7 @@ class _LogViewState extends State<LogView> {
   void initState() {
     super.initState();
     _controller = LogController();
-    Future.microtask(() => _initDatabase());
+    Future.microtask(() => _controller.loadLogs());
   }
 
   Future<void> _initDatabase() async {

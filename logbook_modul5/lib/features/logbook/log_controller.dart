@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:mongo_dart/mongo_dart.dart';
+import 'package:hive/hive.dart';
+import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
 
 import 'models/log_model.dart';
 import '../../services/mongo_service.dart';
@@ -8,22 +9,29 @@ import '../../helpers/log_helper.dart';
 class LogController {
   final ValueNotifier<List<LogModel>> logsNotifier = ValueNotifier<List<LogModel>>([]);
 
+  final _myBox = Hive.box<LogModel>('offline_logs');
+
   List<LogModel> get logs => logsNotifier.value;
 
-  LogController() {
-    // Dikosongkan karena inisialisasi awal sudah ditangani oleh log_view.dart
+  Future<void> loadLogs() async {
+    // Ambil data dari Hive secara instan tanpa loading lama
+    logsNotifier.value = _myBox.values.toList();
   }
 
   Future<void> addLog(String title, String desc, String category) async {
     final newLog = LogModel(
-      id: ObjectId().oid,
+      id: ObjectId().oid, // Gunakan .oid karena id sekarang bertipe String
       title: title,
       description: desc,
       category: category,
-      date: DateTime.now().toString(),
-      authorId: 'user_001', // dummy
-    teamId: 'team_alpha', 
+      date: DateTime.now().toIso8601String(),
+      authorId: 'user_001', // Dummy role, akan diubah di Task 3
+      teamId: 'team_alpha', // Dummy team, akan diubah di Task 3
     );
+
+    await _myBox.put(newLog.id, newLog);
+
+    await loadLogs();
 
     try {
       await MongoService().insertLog(newLog);
@@ -47,16 +55,19 @@ class LogController {
   }
 
   // DIUBAH: Sekarang menggunakan LogModel target, bukan index
-  Future<void> updateLog(LogModel oldLog, String newTitle, String newDesc, String category) async {
+  Future<void> updateLog(LogModel oldLog, String title, String desc, String category) async {
     final updatedLog = LogModel(
       id: oldLog.id,
-      title: newTitle,
-      description: newDesc,
+      title: title,
+      description: desc,
       category: category,
-      date: DateTime.now().toString(), // Update waktu saat diedit
-      authorId: oldLog.authorId, // Ambil dari catatan lama agar tidak hilang
-      teamId: oldLog.teamId,     // Ambil dari catatan lama agar tidak hilang
+      date: DateTime.now().toIso8601String(),
+      authorId: oldLog.authorId,
+      teamId: oldLog.teamId,
     );
+
+    await _myBox.put(oldLog.id, updatedLog);
+    await loadLogs();
 
     try {
       await MongoService().updateLog(updatedLog);
