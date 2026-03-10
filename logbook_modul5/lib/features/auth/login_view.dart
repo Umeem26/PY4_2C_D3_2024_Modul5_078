@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import '../logbook/log_view.dart';
+import '../logbook/log_controller.dart'; // Pastikan path ini sesuai dengan letak file LogController Anda
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -20,8 +21,9 @@ class _LoginViewState extends State<LoginView> {
   int _loginAttempts = 0;
   bool _isLocked = false;
 
-  // --- KREDENSIAL DEFAULT (Silakan ubah sesuai kebutuhan modul Anda) ---
-  final String _validUsername = "admin";
+  // --- KREDENSIAL DEFAULT ---
+  final String _validAdminUser = "admin";
+  final String _validMemberUser = "anggota";
   final String _validPassword = "123";
 
   void _handleLogin() async {
@@ -45,14 +47,24 @@ class _LoginViewState extends State<LoginView> {
     if (mounted) {
       setState(() => _isLoading = false);
 
-      // --- LOGIKA VALIDASI & 3x PERCOBAAN ---
-      if (username == _validUsername && password == _validPassword) {
+      // --- LOGIKA VALIDASI 2 PERAN & 3x PERCOBAAN ---
+      if (password == _validPassword && (username == _validAdminUser || username == _validMemberUser)) {
         // Jika Berhasil
         _loginAttempts = 0; // Reset percobaan
+        
+        // Atur Peran di LogController
+        if (username == _validAdminUser) {
+          LogController.currentUser = 'user_001';
+          LogController.currentRole = 'Ketua';
+        } else {
+          LogController.currentUser = 'user_002';
+          LogController.currentRole = 'Anggota';
+        }
+
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => LogView(),
+            pageBuilder: (context, animation, secondaryAnimation) => const LogView(),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
             },
@@ -220,7 +232,7 @@ class _LoginViewState extends State<LoginView> {
                               enabled: !_isLocked, // Nonaktifkan jika terkunci
                               style: const TextStyle(fontWeight: FontWeight.w600),
                               decoration: InputDecoration(
-                                hintText: "Misal: admin",
+                                hintText: "Misal: admin atau anggota",
                                 hintStyle: TextStyle(color: Colors.grey.shade400, fontWeight: FontWeight.normal),
                                 prefixIcon: Icon(Icons.person_rounded, color: Colors.deepPurple.shade300),
                                 filled: true,

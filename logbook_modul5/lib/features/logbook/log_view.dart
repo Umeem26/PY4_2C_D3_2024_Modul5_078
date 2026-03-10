@@ -190,7 +190,7 @@ class _LogViewState extends State<LogView> {
                   const SizedBox(width: 16),
                   Icon(Icons.person_outline_rounded, size: 16, color: Colors.grey.shade500),
                   const SizedBox(width: 6),
-                  Text(log.authorId == 'user_001' ? 'Ketua' : 'Anggota', style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text(log.authorId == 'user_001' ? 'Ketua Tim' : 'Anggota Tim', style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -529,26 +529,10 @@ class _LogViewState extends State<LogView> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      isExpanded: true,
-                                      value: LogController.currentUser,
-                                      dropdownColor: const Color(0xFF4527A0),
-                                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white),
-                                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                                      items: const [
-                                        DropdownMenuItem(value: 'user_001', child: Text("Ketua Tim", overflow: TextOverflow.ellipsis)),
-                                        DropdownMenuItem(value: 'user_002', child: Text("Anggota Tim", overflow: TextOverflow.ellipsis)),
-                                      ],
-                                      onChanged: (val) {
-                                        if (val != null) {
-                                          setState(() {
-                                            LogController.currentUser = val;
-                                            LogController.currentRole = val == 'user_001' ? 'Ketua' : 'Anggota';
-                                          });
-                                        }
-                                      },
-                                    ),
+                                  Text(
+                                    LogController.currentRole == 'Ketua' ? "Ketua Tim" : "Anggota Tim",
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                                   ),
                                   Text("${_getGreeting()}, punya rencana apa?", overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.deepPurple.shade100, fontSize: 12, fontWeight: FontWeight.w500)),
                                 ],
