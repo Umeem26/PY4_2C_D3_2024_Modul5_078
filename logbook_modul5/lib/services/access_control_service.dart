@@ -13,14 +13,10 @@ class AccessControlService {
 
   // Fungsi Gatekeeper utama
   static bool canPerform(String role, String action, {bool isOwner = false}) {
-    final permissions = _rolePermissions[role] ?? [];
-    bool hasBasicPermission = permissions.contains(action);
-
-    // Logic khusus: Anggota hanya boleh Edit/Delete jika itu adalah datanya sendiri
-    if (role == 'Anggota' && (action == actionUpdate || action == actionDelete)) {
+    if (action == actionUpdate || action == actionDelete) {
       return isOwner;
     }
-
-    return hasBasicPermission;
+    final permissions = _rolePermissions[role] ?? [];
+    return permissions.contains(action);
   }
 }

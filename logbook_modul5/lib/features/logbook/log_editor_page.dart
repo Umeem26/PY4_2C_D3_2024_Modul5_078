@@ -1,161 +1,99 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter/foundation.dart';
+import 'package:hive/hive.dart';
+import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
 import 'models/log_model.dart';
-import 'log_controller.dart';
+import '../../services/mongo_service.dart';
 
-class LogEditorPage extends StatefulWidget {
-  final LogModel? log;
-  final LogController controller;
+class LogController {
+  final ValueNotifier<List<LogModel>> logsNotifier = ValueNotifier<List<LogModel>>([]);
+  final _myBox = Hive.box<LogModel>('offline_logs');
 
-  const LogEditorPage({
-    super.key,
-    this.log,
-    required this.controller,
-  });
+  List<LogModel> get logs => logsNotifier.value;
 
-  @override
-  State<LogEditorPage> createState() => _LogEditorPageState();
-}
+  Future<void> loadLogs() async {
+    logsNotifier.value = _myBox.values.toList();
 
-class _LogEditorPageState extends State<LogEditorPage> {
-  late TextEditingController _titleController;
-  late TextEditingController _descController;
-  String _selectedCategory = 'Pribadi';
-  final List<String> _categories = ['Pribadi', 'Pekerjaan', 'Urgent', 'Lainnya'];
+    try {
+      final cloudData = await MongoService().getLogs();
+      await _myBox.clear();
 
-  @override
-  void initState() {
-    super.initState();
-    _titleController = TextEditingController(text: widget.log?.title ?? '');
-    _descController = TextEditingController(text: widget.log?.description ?? '');
-    _selectedCategory = widget.log?.category ?? 'Pribadi';
+      for (var log in cloudData) {
+        await _myBox.put(log.id, log);
+      }
 
-    _descController.addListener(() {
-      setState(() {});
-    });
+      logsNotifier.value = cloudData;
+    } catch (e) {
+    }
   }
 
-  void _save() {
-    if (_titleController.text.isEmpty || _descController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Judul dan deskripsi tidak boleh kosong", style: TextStyle(fontWeight: FontWeight.bold))),
-      );
-      return;
+  Future<void> syncPendingData() async {
+    final offlineData = _myBox.values.toList();
+    if (offlineData.isEmpty) return;
+
+    bool hasNewDataSynced = false;
+
+    for (var log in offlineData) {
+      try {
+        await MongoService().insertLog(log);
+        hasNewDataSynced = true;
+      } catch (e) {
+      }
     }
 
-    if (widget.log == null) {
-      widget.controller.addLog(
-        _titleController.text,
-        _descController.text,
-        _selectedCategory,
-      );
-    } else {
-      widget.controller.updateLog(
-        widget.log!,
-        _titleController.text,
-        _descController.text,
-        _selectedCategory,
-      );
+    if (hasNewDataSynced) {
+      await loadLogs();
     }
-    Navigator.pop(context);
   }
 
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        backgroundColor: Colors.grey.shade50,
-        appBar: AppBar(
-          title: Text(widget.log == null ? "Catatan Baru" : "Edit Catatan", style: const TextStyle(fontWeight: FontWeight.bold)),
-          backgroundColor: Colors.deepPurple.shade900,
-          foregroundColor: Colors.white,
-          bottom: const TabBar(
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white54,
-            indicatorColor: Colors.white,
-            tabs: [
-              Tab(text: "Editor", icon: Icon(Icons.edit_note_rounded)),
-              Tab(text: "Pratinjau", icon: Icon(Icons.preview_rounded)),
-            ],
-          ),
-          actions: [
-            IconButton(icon: const Icon(Icons.save_rounded), onPressed: _save)
-          ],
-        ),
-        body: TabBarView(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: _titleController,
-                    decoration: InputDecoration(
-                      labelText: "Judul",
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: _selectedCategory,
-                    decoration: InputDecoration(
-                      labelText: "Kategori",
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    ),
-                    items: _categories.map((cat) {
-                      return DropdownMenuItem(value: cat, child: Text(cat));
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) setState(() => _selectedCategory = val);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: TextField(
-                      controller: _descController,
-                      maxLines: null,
-                      expands: true,
-                      textAlignVertical: TextAlignVertical.top,
-                      decoration: InputDecoration(
-                        hintText: "Tulis dengan format Markdown...\nContoh: \n# Judul Besar\n**Teks Tebal**\n- Poin 1",
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-                child: SingleChildScrollView(
-                  child: MarkdownBody(
-                    data: _descController.text.isEmpty ? "_Belum ada teks untuk ditampilkan..._" : _descController.text,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+  Future<void> addLog(String title, String desc, String category, bool isPublic) async {
+    final newLog = LogModel(
+      id: ObjectId().oid,
+      title: title,
+      description: desc,
+      category: category,
+      date: DateTime.now().toIso8601String(),
+      authorId: 'user_001',
+      teamId: 'team_alpha',
+      isPublic: isPublic,
     );
+
+    await _myBox.put(newLog.id, newLog);
+    await loadLogs();
+
+    try {
+      await MongoService().insertLog(newLog);
+    } catch (e) {
+    }
+  }
+
+  Future<void> updateLog(LogModel oldLog, String title, String desc, String category, bool isPublic) async {
+    final updatedLog = LogModel(
+      id: oldLog.id,
+      title: title,
+      description: desc,
+      category: category,
+      date: DateTime.now().toIso8601String(),
+      authorId: oldLog.authorId,
+      teamId: oldLog.teamId,
+      isPublic: isPublic,
+    );
+
+    await _myBox.put(oldLog.id, updatedLog);
+    await loadLogs();
+
+    try {
+      await MongoService().updateLog(updatedLog);
+    } catch (e) {
+    }
+  }
+
+  Future<void> removeLog(LogModel log) async {
+    await _myBox.delete(log.id);
+    await loadLogs();
+
+    try {
+      await MongoService().deleteLog(log.id!);
+    } catch (e) {
+    }
   }
 }

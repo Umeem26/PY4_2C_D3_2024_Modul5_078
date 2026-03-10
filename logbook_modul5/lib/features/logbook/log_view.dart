@@ -275,11 +275,17 @@ class _LogViewState extends State<LogView> {
                   return _buildSkeletonLoading();
                 }
 
-                List<LogModel> displayLogs = currentLogs;
+                List<LogModel> displayLogs = currentLogs.where((log) {
+                  return log.authorId == 'user_001' || log.isPublic == true;
+                }).toList();
+
                 String searchQuery = _searchController.text.toLowerCase();
-                
                 if (searchQuery.isNotEmpty) {
-                  displayLogs = currentLogs.where((log) => log.title.toLowerCase().contains(searchQuery) || log.description.toLowerCase().contains(searchQuery) || log.category.toLowerCase().contains(searchQuery)).toList();
+                  displayLogs = displayLogs.where((log) =>
+                  log.title.toLowerCase().contains(searchQuery) ||
+                      log.description.toLowerCase().contains(searchQuery) ||
+                      log.category.toLowerCase().contains(searchQuery)
+                  ).toList();
                 }
 
                 if (currentLogs.isEmpty) {

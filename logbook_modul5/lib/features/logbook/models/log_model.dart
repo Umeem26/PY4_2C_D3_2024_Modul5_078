@@ -24,7 +24,10 @@ class LogModel {
   final String teamId; 
 
   @HiveField(6)
-  final String category; 
+  final String category;
+
+  @HiveField(7)
+  final bool isPublic;
 
   LogModel({
     this.id,
@@ -34,6 +37,7 @@ class LogModel {
     required this.authorId,
     required this.teamId,
     required this.category,
+    this.isPublic = false,
   });
 
   Map<String, dynamic> toMap() => {
@@ -44,6 +48,7 @@ class LogModel {
     'authorId': authorId,
     'teamId': teamId,
     'category': category,
+    'isPublic': isPublic,
   };
 
   factory LogModel.fromMap(Map<String, dynamic> map) {
@@ -55,6 +60,7 @@ class LogModel {
       authorId: map['authorId'] ?? 'unknown_user',
       teamId: map['teamId'] ?? 'no_team',
       category: map['category'] ?? 'Pribadi',
+      isPublic: map['isPublic'] ?? false,
     );
   }
 }
