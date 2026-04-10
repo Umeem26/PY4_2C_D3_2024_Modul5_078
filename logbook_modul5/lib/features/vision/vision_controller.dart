@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:isolate'; // <-- KUNCI PERBAIKAN: Background Thread!
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ class VisionController extends ChangeNotifier with WidgetsBindingObserver {
   bool isFlashlightOn = false;
   bool isProcessing = false; 
   bool isOverlayVisible = true; 
+  String loadingMessage = "Memproses...";
 
   final List<String> pcdModes = [
     'Normal (Original)',
@@ -58,18 +60,15 @@ class VisionController extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  // --- PERBAIKAN 1: MENGGUNAKAN MODE TORCH AGAR MENYALA TERUS ---
   Future<void> toggleFlashlight() async {
     if (controller == null || !controller!.value.isInitialized) return;
     
     isFlashlightOn = !isFlashlightOn;
     try {
-      await controller!.setFlashMode(
-        isFlashlightOn ? FlashMode.torch : FlashMode.off, 
-      );
+      await controller!.setFlashMode(isFlashlightOn ? FlashMode.torch : FlashMode.off);
     } catch (e) {
       errorMessage = "Gagal menyalakan flash: $e";
-      isFlashlightOn = !isFlashlightOn; // Kembalikan state jika gagal
+      isFlashlightOn = !isFlashlightOn; 
     }
     notifyListeners();
   }
@@ -79,56 +78,73 @@ class VisionController extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  // --- PERBAIKAN 2: MANAJEMEN LOADING & ERROR YANG LEBIH AMAN ---
   Future<Uint8List?> captureAndProcessImage() async {
     if (controller == null || !controller!.value.isInitialized) return null;
 
     try {
       isProcessing = true;
       errorMessage = null;
+      loadingMessage = "1/3 Menjepret Foto...";
       notifyListeners();
 
-      // Jeda nafas untuk UI
-      await Future.delayed(const Duration(milliseconds: 150));
+      await Future.delayed(const Duration(milliseconds: 100));
 
-      // HAPUS pausePreview() karena memicu bug di hardware Android tertentu
-      final XFile imageFile = await controller!.takePicture();
+      final XFile imageFile = await controller!.takePicture().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => throw Exception("Kamera macet (Timeout)."),
+      );
+
+      loadingMessage = "2/3 Membaca Sensor Gambar...";
+      notifyListeners();
+      
       final Uint8List imageBytes = await imageFile.readAsBytes();
 
-      cv.Mat srcMat = cv.imdecode(imageBytes, cv.IMREAD_COLOR);
-      if (srcMat.isEmpty) throw Exception("Gagal decode gambar ke matriks");
-      cv.Mat resultMat;
+      loadingMessage = "3/3 Memproses Filter OpenCV...";
+      notifyListeners();
 
-      switch (currentPcdMode) {
-        case 'Grayscale':
-          resultMat = cv.cvtColor(srcMat, cv.COLOR_BGR2GRAY);
-          break;
-        case 'Equalize Histogram':
-          cv.Mat gray = cv.cvtColor(srcMat, cv.COLOR_BGR2GRAY);
-          resultMat = cv.equalizeHist(gray);
-          break;
-        case 'Blur (Konvolusi)':
-          resultMat = cv.gaussianBlur(srcMat, (15, 15), 0);
-          break;
-        case 'Edge Detection (Canny)':
-          resultMat = cv.canny(srcMat, 100, 200);
-          break;
-        case 'Normal (Original)':
-        default:
-          resultMat = srcMat.clone();
-      }
+      // Tangkap filter yang sedang dipilih untuk dikirim ke Isolate
+      final String modeToProcess = currentPcdMode;
 
-      final encodeResult = cv.imencode('.jpg', resultMat);
-      final Uint8List finalImageBytes = encodeResult.$2; 
+      // --- ISOLATE: Memindahkan OpenCV ke Background Thread ---
+      final Uint8List finalImageBytes = await Isolate.run(() {
+        cv.Mat srcMat = cv.imdecode(imageBytes, cv.IMREAD_COLOR);
+        if (srcMat.isEmpty) throw Exception("Gagal membaca piksel gambar.");
+        
+        cv.Mat resultMat;
+        switch (modeToProcess) {
+          case 'Grayscale':
+            resultMat = cv.cvtColor(srcMat, cv.COLOR_BGR2GRAY);
+            break;
+          case 'Equalize Histogram':
+            cv.Mat gray = cv.cvtColor(srcMat, cv.COLOR_BGR2GRAY);
+            resultMat = cv.equalizeHist(gray);
+            break;
+          case 'Blur (Konvolusi)':
+            resultMat = cv.gaussianBlur(srcMat, (15, 15), 0);
+            break;
+          case 'Edge Detection (Canny)':
+            resultMat = cv.canny(srcMat, 100, 200);
+            break;
+          case 'Normal (Original)':
+          default:
+            resultMat = srcMat.clone();
+        }
+
+        final encodeResult = cv.imencode('.jpg', resultMat);
+        return encodeResult.$2;
+      });
 
       return finalImageBytes;
       
     } catch (e) {
-      errorMessage = "Error komputasi matriks: $e";
+      errorMessage = "Gagal memproses: $e";
       return null;
     } finally {
-      // Pastikan status processing dikembalikan
       isProcessing = false;
+      // Memaksa kamera untuk terus berjalan setelah selesai proses
+      try {
+        await controller!.resumePreview();
+      } catch (_) {}
       notifyListeners();
     }
   }
@@ -138,7 +154,6 @@ class VisionController extends ChangeNotifier with WidgetsBindingObserver {
     final CameraController? cameraController = controller;
     if (cameraController == null || !cameraController.value.isInitialized) return;
 
-    // KUNCI PERBAIKAN: Kekebalan! Jangan matikan kamera jika sedang memproses foto
     if (isProcessing) return; 
 
     if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
