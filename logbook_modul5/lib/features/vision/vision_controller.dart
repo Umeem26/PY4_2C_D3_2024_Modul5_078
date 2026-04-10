@@ -12,8 +12,8 @@ class VisionController extends ChangeNotifier with WidgetsBindingObserver {
   String? errorMessage;
   bool isFlashlightOn = false;
   bool isProcessing = false; 
+  bool isOverlayVisible = true; 
 
-  // --- OPSI MODE PENGOLAHAN CITRA DIGITAL (PCD) ---
   final List<String> pcdModes = [
     'Normal (Original)',
     'Grayscale',
@@ -58,32 +58,45 @@ class VisionController extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  // --- PERBAIKAN 1: MENGGUNAKAN MODE TORCH AGAR MENYALA TERUS ---
   Future<void> toggleFlashlight() async {
     if (controller == null || !controller!.value.isInitialized) return;
+    
     isFlashlightOn = !isFlashlightOn;
     try {
       await controller!.setFlashMode(
-        isFlashlightOn ? FlashMode.always : FlashMode.off,
+        isFlashlightOn ? FlashMode.torch : FlashMode.off, 
       );
     } catch (e) {
       errorMessage = "Gagal menyalakan flash: $e";
+      isFlashlightOn = !isFlashlightOn; // Kembalikan state jika gagal
     }
     notifyListeners();
   }
 
-  /// --- FUNGSI INTI PCD (Jembatan Flutter ke OpenCV) ---
+  void toggleOverlay() {
+    isOverlayVisible = !isOverlayVisible;
+    notifyListeners();
+  }
+
+  // --- PERBAIKAN 2: MANAJEMEN LOADING & ERROR YANG LEBIH AMAN ---
   Future<Uint8List?> captureAndProcessImage() async {
     if (controller == null || !controller!.value.isInitialized) return null;
 
     try {
       isProcessing = true;
+      errorMessage = null;
       notifyListeners();
 
-      await controller!.pausePreview();
+      // Jeda nafas untuk UI
+      await Future.delayed(const Duration(milliseconds: 150));
+
+      // HAPUS pausePreview() karena memicu bug di hardware Android tertentu
       final XFile imageFile = await controller!.takePicture();
       final Uint8List imageBytes = await imageFile.readAsBytes();
 
       cv.Mat srcMat = cv.imdecode(imageBytes, cv.IMREAD_COLOR);
+      if (srcMat.isEmpty) throw Exception("Gagal decode gambar ke matriks");
       cv.Mat resultMat;
 
       switch (currentPcdMode) {
@@ -108,18 +121,15 @@ class VisionController extends ChangeNotifier with WidgetsBindingObserver {
       final encodeResult = cv.imencode('.jpg', resultMat);
       final Uint8List finalImageBytes = encodeResult.$2; 
 
-      await controller!.resumePreview();
-      
-      isProcessing = false;
-      notifyListeners();
-
       return finalImageBytes;
       
     } catch (e) {
-      errorMessage = "Error saat memproses citra: $e";
+      errorMessage = "Error komputasi matriks: $e";
+      return null;
+    } finally {
+      // Pastikan status processing dikembalikan
       isProcessing = false;
       notifyListeners();
-      return null;
     }
   }
 
@@ -128,7 +138,10 @@ class VisionController extends ChangeNotifier with WidgetsBindingObserver {
     final CameraController? cameraController = controller;
     if (cameraController == null || !cameraController.value.isInitialized) return;
 
-    if (state == AppLifecycleState.inactive) {
+    // KUNCI PERBAIKAN: Kekebalan! Jangan matikan kamera jika sedang memproses foto
+    if (isProcessing) return; 
+
+    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
       cameraController.dispose();
       isInitialized = false;
       notifyListeners();

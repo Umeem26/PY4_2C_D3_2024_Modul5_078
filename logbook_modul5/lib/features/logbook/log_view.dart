@@ -7,6 +7,7 @@ import 'log_controller.dart';
 import 'models/log_model.dart';
 import 'log_editor_page.dart';
 import '../auth/login_view.dart';
+import '../vision/vision_view.dart';
 
 class LogView extends StatefulWidget {
   const LogView({super.key});
@@ -601,6 +602,20 @@ class _LogViewState extends State<LogView> with SingleTickerProviderStateMixin {
                             ),
                           ),
                           const SizedBox(width: 12),
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(14)),
+                              child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 20),
+                            ),
+                            onPressed: () {
+                              // Membuka halaman VisionView saat ditekan
+                              Navigator.push(context, MaterialPageRoute(builder: (context) => const VisionView()));
+                            },
+                          ),
+                          const SizedBox(width: 8),
                           IconButton(
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
